@@ -1,0 +1,8 @@
+{
+  "name": "Water & Gas Store Dashboard",
+  "description": "A modern premium admin dashboard for managing water gallon, bottled water, and gas store stock and sales.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
