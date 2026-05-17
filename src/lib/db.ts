@@ -170,3 +170,48 @@ export async function processSaleOrStockIn(
   return transactionId;
 }
 
+export interface Debt {
+  id?: string;
+  storeId: string;
+  type: 'customer' | 'supplier';
+  entityName: string;
+  amount: number;
+  description: string;
+  status: 'unpaid' | 'paid';
+  createdAt: number;
+  dueDate?: number;
+  paidAt?: number;
+}
+
+export async function fetchStoreDebts(storeId: string) {
+  const q = query(
+    collection(db, `stores/${storeId}/debts`),
+    orderBy('createdAt', 'desc')
+  );
+  try {
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Debt));
+  } catch (error) {
+    console.error("fetchStoreDebts Error", error);
+    throw error;
+  }
+}
+
+export async function addDebt(storeId: string, debtData: Omit<Debt, 'id' | 'storeId' | 'createdAt'>) {
+  const debtId = `debt-${Date.now()}`;
+  const now = Date.now();
+  await setDoc(doc(db, `stores/${storeId}/debts`, debtId), {
+    ...debtData,
+    storeId,
+    createdAt: now
+  });
+  return debtId;
+}
+
+export async function markDebtAsPaid(storeId: string, debtId: string) {
+  const now = Date.now();
+  await setDoc(doc(db, `stores/${storeId}/debts`, debtId), {
+    status: 'paid',
+    paidAt: now
+  }, { merge: true });
+}
