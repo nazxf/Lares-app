@@ -105,6 +105,18 @@ export async function fetchStockMovements(storeId: string, limit = 100) {
   return apiRequest<any[]>(`/api/stores/${encodeURIComponent(storeId)}/stock-movements?limit=${limit}`);
 }
 
+export async function addStockMovement(storeId: string, movementData: {
+  productId: string;
+  type: 'in' | 'out';
+  quantity: number;
+  notes?: string;
+}) {
+  return apiRequest<any>(`/api/stores/${encodeURIComponent(storeId)}/stock-movements`, {
+    method: 'POST',
+    body: movementData,
+  });
+}
+
 export async function addProduct(storeId: string, productData: any) {
   const result = await apiRequest<{ id: string }>(`/api/stores/${encodeURIComponent(storeId)}/products`, {
     method: 'POST',

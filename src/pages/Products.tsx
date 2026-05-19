@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchStoreProducts, addProduct, updateProduct } from '../lib/db';
+import { fetchStoreProducts, addProduct, updateProduct, addStockMovement } from '../lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Edit2 } from 'lucide-react';
+import { Plus, Search, Edit2, PackagePlus, PackageMinus } from 'lucide-react';
 import { toast } from 'sonner';
 import Fuse from 'fuse.js';
 
@@ -21,6 +21,11 @@ export default function Products() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  
+  // Stock adjustment dialog
+  const [isStockDialogOpen, setIsStockDialogOpen] = useState(false);
+  const [stockProduct, setStockProduct] = useState<any>(null);
+  const [stockType, setStockType] = useState<'in' | 'out'>('in');
 
   useEffect(() => {
     loadProducts();
@@ -70,6 +75,41 @@ export default function Products() {
     }
   };
 
+  const handleStockAdjustment = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!userProfile?.storeId || !stockProduct) return;
+
+    const fd = new FormData(e.currentTarget);
+    const quantity = Number(fd.get('quantity'));
+    const notes = fd.get('notes') as string;
+
+    if (quantity <= 0) {
+      toast.error('Jumlah harus lebih dari 0');
+      return;
+    }
+
+    try {
+      await addStockMovement(userProfile.storeId, {
+        productId: stockProduct.id,
+        type: stockType,
+        quantity,
+        notes
+      });
+      
+      toast.success(`Stok ${stockType === 'in' ? 'ditambah' : 'dikurangi'} sebanyak ${quantity} ${stockProduct.unitType}`);
+      setIsStockDialogOpen(false);
+      loadProducts();
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengubah stok');
+    }
+  };
+
+  const openStockDialog = (product: any, type: 'in' | 'out') => {
+    setStockProduct(product);
+    setStockType(type);
+    setIsStockDialogOpen(true);
+  };
+
   const openEdit = (p: any) => {
     setEditingProduct(p);
     setIsDialogOpen(true);
@@ -97,7 +137,6 @@ export default function Products() {
           <h2 className="text-2xl font-bold text-slate-800">Manajemen Produk</h2>
           <p className="text-slate-500 text-sm mt-1">Kelola stok dan harga barang Anda</p>
         </div>
-        
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -135,7 +174,7 @@ export default function Products() {
               <TableHead className="text-right">Harga Jual</TableHead>
               <TableHead className="text-center">Stok</TableHead>
               <TableHead className="text-center">Status</TableHead>
-              <TableHead></TableHead>
+              <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -165,9 +204,29 @@ export default function Products() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <button onClick={() => openEdit(p)} className="p-2 text-slate-400 hover:text-blue-600 transition-colors">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button 
+                        onClick={() => openStockDialog(p, 'in')} 
+                        className="p-2 text-slate-400 hover:text-green-600 transition-colors"
+                        title="Tambah Stok"
+                      >
+                        <PackagePlus className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => openStockDialog(p, 'out')} 
+                        className="p-2 text-slate-400 hover:text-red-600 transition-colors"
+                        title="Kurangi Stok"
+                      >
+                        <PackageMinus className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => openEdit(p)} 
+                        className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                        title="Edit Produk"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -176,6 +235,7 @@ export default function Products() {
         </Table>
       </div>
 
+      {/* Product Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -257,6 +317,61 @@ export default function Products() {
             <DialogFooter className="mt-6">
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Batal</Button>
               <Button type="submit">{editingProduct ? 'Simpan Perubahan' : 'Tambah Produk'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stock Adjustment Dialog */}
+      <Dialog open={isStockDialogOpen} onOpenChange={setIsStockDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {stockType === 'in' ? '➕ Tambah Stok' : '➖ Kurangi Stok'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleStockAdjustment} className="space-y-4 pt-4">
+            <div className="bg-slate-50 p-4 rounded-xl">
+              <p className="text-sm text-slate-500">Produk</p>
+              <p className="font-bold text-slate-800">{stockProduct?.name}</p>
+              <p className="text-sm text-slate-500 mt-2">Stok Saat Ini</p>
+              <p className="font-bold text-lg text-slate-800">
+                {stockProduct?.stock} <span className="text-sm font-normal">{stockProduct?.unitType}</span>
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="quantity">
+                Jumlah {stockType === 'in' ? 'Masuk' : 'Keluar'} ({stockProduct?.unitType})
+              </Label>
+              <Input 
+                id="quantity" 
+                name="quantity" 
+                type="number" 
+                min="1" 
+                required 
+                placeholder="Contoh: 50"
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Catatan (Opsional)</Label>
+              <Input 
+                id="notes" 
+                name="notes" 
+                placeholder={stockType === 'in' ? 'Contoh: Pembelian dari supplier' : 'Contoh: Rusak/Hilang'}
+              />
+            </div>
+
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="outline" onClick={() => setIsStockDialogOpen(false)}>Batal</Button>
+              <Button 
+                type="submit"
+                className={stockType === 'in' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
+              >
+                {stockType === 'in' ? 'Tambah Stok' : 'Kurangi Stok'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
