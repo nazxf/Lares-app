@@ -47,7 +47,7 @@ export class CacheHelper {
     if (!this.redis) return;
 
     try {
-      await this.redis.setex(key, ttlSeconds, value);
+      await this.redis.set(key, value, { ex: ttlSeconds });
       console.log(`Cache SET: ${key} (TTL: ${ttlSeconds}s)`);
     } catch (error) {
       console.error(`Redis SET error for ${key}:`, error);
