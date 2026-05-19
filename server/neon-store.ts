@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
+import { cache } from './redis.js';
 
 export class NeonStore {
   private sql: ReturnType<typeof neon>;
@@ -11,13 +12,18 @@ export class NeonStore {
   // Auth methods
   async login(email: string, name: string) {
     try {
+      // Check cache first
+      const cacheKey = `user:email:${email}`;
+      const cached = await cache.get<any>(cacheKey);
+      if (cached) return cached;
+
       // Check if user exists
       const users = await this.sql`
         SELECT * FROM users WHERE email = ${email}
       ` as any[];
 
       if (users.length > 0) {
-        return {
+        const user = {
           id: users[0].id,
           email: users[0].email,
           name: users[0].name,
@@ -25,6 +31,12 @@ export class NeonStore {
           storeId: users[0].store_id,
           createdAt: Number(users[0].created_at)
         };
+        
+        // Cache for 5 minutes
+        await cache.set(cacheKey, user, 300);
+        await cache.set(`user:id:${user.id}`, user, 300);
+        
+        return user;
       }
 
       // Create new user
@@ -36,14 +48,20 @@ export class NeonStore {
         VALUES (${id}, ${email}, ${name}, 'owner', ${now})
       `;
 
-      return {
+      const newUser = {
         id,
         email,
         name,
-        role: 'owner',
+        role: 'owner' as const,
         storeId: null,
         createdAt: now
       };
+
+      // Cache new user
+      await cache.set(cacheKey, newUser, 300);
+      await cache.set(`user:id:${id}`, newUser, 300);
+
+      return newUser;
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -52,10 +70,15 @@ export class NeonStore {
 
   // User methods
   async getUser(userId: string) {
+    // Check cache first
+    const cacheKey = `user:id:${userId}`;
+    const cached = await cache.get<any>(cacheKey);
+    if (cached) return cached;
+
     const users = await this.sql`SELECT * FROM users WHERE id = ${userId}` as any[];
     if (users.length === 0) return null;
     
-    return {
+    const user = {
       id: users[0].id,
       email: users[0].email,
       name: users[0].name,
@@ -63,6 +86,11 @@ export class NeonStore {
       storeId: users[0].store_id,
       createdAt: Number(users[0].created_at)
     };
+
+    // Cache for 5 minutes
+    await cache.set(cacheKey, user, 300);
+    
+    return user;
   }
 
   async updateUser(userId: string, data: { name?: string; storeId?: string }) {
@@ -74,7 +102,8 @@ export class NeonStore {
         RETURNING *
       ` as any[];
       if (result.length === 0) return null;
-      return {
+      
+      const user = {
         id: result[0].id,
         email: result[0].email,
         name: result[0].name,
@@ -82,6 +111,12 @@ export class NeonStore {
         storeId: result[0].store_id,
         createdAt: Number(result[0].created_at)
       };
+
+      // Invalidate cache
+      await cache.del(`user:id:${userId}`);
+      await cache.del(`user:email:${user.email}`);
+      
+      return user;
     } else if (data.name !== undefined) {
       const result = await this.sql`
         UPDATE users 
@@ -90,7 +125,8 @@ export class NeonStore {
         RETURNING *
       ` as any[];
       if (result.length === 0) return null;
-      return {
+      
+      const user = {
         id: result[0].id,
         email: result[0].email,
         name: result[0].name,
@@ -98,6 +134,12 @@ export class NeonStore {
         storeId: result[0].store_id,
         createdAt: Number(result[0].created_at)
       };
+
+      // Invalidate cache
+      await cache.del(`user:id:${userId}`);
+      await cache.del(`user:email:${user.email}`);
+      
+      return user;
     } else if (data.storeId !== undefined) {
       const result = await this.sql`
         UPDATE users 
@@ -106,7 +148,8 @@ export class NeonStore {
         RETURNING *
       ` as any[];
       if (result.length === 0) return null;
-      return {
+      
+      const user = {
         id: result[0].id,
         email: result[0].email,
         name: result[0].name,
@@ -114,6 +157,12 @@ export class NeonStore {
         storeId: result[0].store_id,
         createdAt: Number(result[0].created_at)
       };
+
+      // Invalidate cache
+      await cache.del(`user:id:${userId}`);
+      await cache.del(`user:email:${user.email}`);
+      
+      return user;
     }
 
     return this.getUser(userId);
@@ -127,31 +176,48 @@ export class NeonStore {
     await this.sql`
       INSERT INTO stores (id, name, owner_id, created_at)
       VALUES (${id}, ${name}, ${ownerId}, ${now})
-    `;
+    ` as any[];
 
     await this.sql`
       UPDATE users SET store_id = ${id} WHERE id = ${ownerId}
-    `;
+    ` as any[];
+
+    // Invalidate user cache
+    await cache.del(`user:id:${ownerId}`);
 
     return { id, name, ownerId, createdAt: now };
   }
 
   async getStore(storeId: string) {
+    // Check cache first
+    const cacheKey = `store:${storeId}`;
+    const cached = await cache.get<any>(cacheKey);
+    if (cached) return cached;
+
     const stores = await this.sql`SELECT * FROM stores WHERE id = ${storeId}` as any[];
     if (stores.length === 0) return null;
     
-    return {
+    const store = {
       id: stores[0].id,
       name: stores[0].name,
       ownerId: stores[0].owner_id,
       createdAt: Number(stores[0].created_at)
     };
+
+    // Cache for 10 minutes
+    await cache.set(cacheKey, store, 600);
+    
+    return store;
   }
 
   async updateStore(storeId: string, data: { name: string }) {
     await this.sql`
       UPDATE stores SET name = ${data.name} WHERE id = ${storeId}
-    `;
+    ` as any[];
+    
+    // Invalidate cache
+    await cache.del(`store:${storeId}`);
+    
     return this.getStore(storeId);
   }
 
@@ -170,17 +236,25 @@ export class NeonStore {
         ${data.minimumStock || 1}, ${data.unitType}, ${data.status || 'active'},
         ${now}, ${now}
       )
-    `;
+    ` as any[];
+
+    // Invalidate products cache
+    await cache.del(`products:${storeId}`);
 
     return { id, ...data, storeId, createdAt: now, updatedAt: now };
   }
 
   async getProducts(storeId: string) {
+    // Check cache first - CRITICAL for performance
+    const cacheKey = `products:${storeId}`;
+    const cached = await cache.get<any[]>(cacheKey);
+    if (cached) return cached;
+
     const products = await this.sql`
       SELECT * FROM products WHERE store_id = ${storeId} ORDER BY updated_at DESC
     ` as any[];
     
-    return products.map(p => ({
+    const result = products.map(p => ({
       id: p.id,
       storeId: p.store_id,
       name: p.name,
@@ -194,6 +268,11 @@ export class NeonStore {
       createdAt: Number(p.created_at),
       updatedAt: Number(p.updated_at)
     }));
+
+    // Cache for 2 minutes (products change frequently)
+    await cache.set(cacheKey, result, 120);
+    
+    return result;
   }
 
   async getProduct(productId: string) {
@@ -232,13 +311,28 @@ export class NeonStore {
         status = ${data.status},
         updated_at = ${now}
       WHERE id = ${productId}
-    `;
+    ` as any[];
 
-    return this.getProduct(productId);
+    const product = await this.getProduct(productId);
+    
+    // Invalidate products cache
+    if (product) {
+      await cache.del(`products:${product.storeId}`);
+    }
+
+    return product;
   }
 
   async deleteProduct(productId: string) {
-    await this.sql`DELETE FROM products WHERE id = ${productId}`;
+    const product = await this.getProduct(productId);
+    
+    await this.sql`DELETE FROM products WHERE id = ${productId}` as any[];
+    
+    // Invalidate products cache
+    if (product) {
+      await cache.del(`products:${product.storeId}`);
+    }
+    
     return { success: true };
   }
 
@@ -254,12 +348,21 @@ export class NeonStore {
         ${id}, ${storeId}, ${data.type}, ${JSON.stringify(data.items)},
         ${data.totalAmount}, ${data.cashierId}, ${data.notes || null}, ${now}
       )
-    `;
+    ` as any[];
+
+    // Invalidate transactions cache
+    await cache.del(`transactions:${storeId}:latest`);
+    await cache.del(`analytics:${storeId}:*`);
 
     return { id, ...data, storeId, createdAt: now };
   }
 
   async getTransactions(storeId: string, filters?: any) {
+    // Cache key based on filters
+    const cacheKey = `transactions:${storeId}:${filters?.type || 'all'}:${filters?.limit || 50}`;
+    const cached = await cache.get<any[]>(cacheKey);
+    if (cached) return cached;
+
     let transactions;
 
     if (filters?.type && filters?.limit) {
@@ -268,29 +371,29 @@ export class NeonStore {
         WHERE store_id = ${storeId} AND type = ${filters.type}
         ORDER BY created_at DESC
         LIMIT ${filters.limit}
-      `;
+      ` as any[];
     } else if (filters?.type) {
       transactions = await this.sql`
         SELECT * FROM transactions 
         WHERE store_id = ${storeId} AND type = ${filters.type}
         ORDER BY created_at DESC
-      `;
+      ` as any[];
     } else if (filters?.limit) {
       transactions = await this.sql`
         SELECT * FROM transactions 
         WHERE store_id = ${storeId}
         ORDER BY created_at DESC
         LIMIT ${filters.limit}
-      `;
+      ` as any[];
     } else {
       transactions = await this.sql`
         SELECT * FROM transactions 
         WHERE store_id = ${storeId}
         ORDER BY created_at DESC
-      `;
+      ` as any[];
     }
     
-    return transactions.map(t => ({
+    const result = transactions.map(t => ({
       id: t.id,
       storeId: t.store_id,
       type: t.type,
@@ -300,6 +403,11 @@ export class NeonStore {
       notes: t.notes,
       createdAt: Number(t.created_at)
     }));
+
+    // Cache for 1 minute
+    await cache.set(cacheKey, result, 60);
+    
+    return result;
   }
 
   // Stock movement methods
@@ -314,25 +422,34 @@ export class NeonStore {
         ${id}, ${storeId}, ${data.productId}, ${data.type},
         ${data.quantity}, ${data.notes || null}, ${now}
       )
-    `;
+    ` as any[];
 
     // Update product stock
     if (data.type === 'in') {
       await this.sql`
         UPDATE products SET stock = stock + ${data.quantity}
         WHERE id = ${data.productId}
-      `;
+      ` as any[];
     } else if (data.type === 'out') {
       await this.sql`
         UPDATE products SET stock = stock - ${data.quantity}
         WHERE id = ${data.productId}
-      `;
+      ` as any[];
     }
+
+    // Invalidate caches
+    await cache.del(`products:${storeId}`);
+    await cache.del(`movements:${storeId}:latest`);
 
     return { id, ...data, storeId, createdAt: now };
   }
 
   async getStockMovements(storeId: string, filters?: any) {
+    // Cache key based on filters
+    const cacheKey = `movements:${storeId}:${filters?.productId || 'all'}:${filters?.limit || 50}`;
+    const cached = await cache.get<any[]>(cacheKey);
+    if (cached) return cached;
+
     let movements;
 
     if (filters?.productId && filters?.limit) {
@@ -341,29 +458,29 @@ export class NeonStore {
         WHERE store_id = ${storeId} AND product_id = ${filters.productId}
         ORDER BY created_at DESC
         LIMIT ${filters.limit}
-      `;
+      ` as any[];
     } else if (filters?.productId) {
       movements = await this.sql`
         SELECT * FROM stock_movements 
         WHERE store_id = ${storeId} AND product_id = ${filters.productId}
         ORDER BY created_at DESC
-      `;
+      ` as any[];
     } else if (filters?.limit) {
       movements = await this.sql`
         SELECT * FROM stock_movements 
         WHERE store_id = ${storeId}
         ORDER BY created_at DESC
         LIMIT ${filters.limit}
-      `;
+      ` as any[];
     } else {
       movements = await this.sql`
         SELECT * FROM stock_movements 
         WHERE store_id = ${storeId}
         ORDER BY created_at DESC
-      `;
+      ` as any[];
     }
     
-    return movements.map(m => ({
+    const result = movements.map(m => ({
       id: m.id,
       storeId: m.store_id,
       productId: m.product_id,
@@ -372,15 +489,25 @@ export class NeonStore {
       notes: m.notes,
       createdAt: Number(m.created_at)
     }));
+
+    // Cache for 1 minute
+    await cache.set(cacheKey, result, 60);
+    
+    return result;
   }
 
   // Analytics methods
   async getAnalytics(storeId: string, period: string) {
+    // Check cache first - analytics can be stale
+    const cacheKey = `analytics:${storeId}:${period}`;
+    const cached = await cache.get<any>(cacheKey);
+    if (cached) return cached;
+
     // Simplified analytics - can be expanded
     const transactions = await this.getTransactions(storeId, { limit: 100 });
     const products = await this.getProducts(storeId);
 
-    return {
+    const result = {
       totalRevenue: transactions
         .filter(t => t.type === 'sale')
         .reduce((sum, t) => sum + t.totalAmount, 0),
@@ -388,6 +515,10 @@ export class NeonStore {
       totalProducts: products.length,
       lowStockProducts: products.filter(p => p.stock <= p.minimumStock).length
     };
+
+    // Cache for 5 minutes
+    await cache.set(cacheKey, result, 300);
+    
+    return result;
   }
 }
-
