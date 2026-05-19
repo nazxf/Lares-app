@@ -1,172 +1,150 @@
-import { collection, query, getDocs, doc, setDoc, Timestamp, orderBy, limit, writeBatch } from 'firebase/firestore';
-import { db } from '../firebase';
-
-export async function fetchStoreProducts(storeId: string) {
-  const q = query(
-    collection(db, `stores/${storeId}/products`),
-    orderBy('name', 'asc')
-  );
-  try {
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    console.error("fetchStoreProducts Error", error);
-    throw error;
-  }
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: 'owner' | 'cashier';
+  storeId?: string;
+  createdAt: number;
 }
 
-export async function fetchStoreTransactions(storeId: string) {
-  const q = query(
-    collection(db, `stores/${storeId}/transactions`),
-    orderBy('createdAt', 'desc'),
-    limit(50)
-  );
-  try {
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    console.error("fetchStoreTransactions Error", error);
-    throw error;
+export interface LocalUser {
+  uid: string;
+  email: string;
+  displayName: string;
+}
+
+type RequestOptions = Omit<RequestInit, 'body'> & {
+  body?: unknown;
+};
+
+async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+
+  if (!response.ok) {
+    let message = 'Terjadi kesalahan';
+    try {
+      const error = await response.json();
+      message = error.message || message;
+    } catch {
+      message = response.statusText || message;
+    }
+    throw new Error(message);
   }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json();
+}
+
+function toLocalUser(profile: UserProfile): LocalUser {
+  return {
+    uid: profile.id,
+    email: profile.email,
+    displayName: profile.name,
+  };
+}
+
+export async function loginWithSql(email: string, name: string) {
+  const profile = await apiRequest<UserProfile>('/api/auth/login', {
+    method: 'POST',
+    body: { email, name },
+  });
+
+  return {
+    currentUser: toLocalUser(profile),
+    profile,
+  };
+}
+
+export async function fetchUserProfile(userId: string) {
+  const profile = await apiRequest<UserProfile>(`/api/users/${encodeURIComponent(userId)}`);
+
+  return {
+    currentUser: toLocalUser(profile),
+    profile,
+  };
+}
+
+export async function updateUserProfile(userId: string, profileUpdate: Partial<UserProfile>) {
+  const profile = await apiRequest<UserProfile>(`/api/users/${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    body: profileUpdate,
+  });
+
+  return {
+    currentUser: toLocalUser(profile),
+    profile,
+  };
+}
+
+export async function createStore(name: string, ownerId: string) {
+  return apiRequest<{ id: string; name: string; ownerId: string; createdAt: number }>('/api/stores', {
+    method: 'POST',
+    body: { name, ownerId },
+  });
+}
+
+export async function fetchStoreProducts(storeId: string) {
+  return apiRequest<any[]>(`/api/stores/${encodeURIComponent(storeId)}/products`);
+}
+
+export async function fetchStoreTransactions(storeId: string, limit = 50) {
+  return apiRequest<any[]>(`/api/stores/${encodeURIComponent(storeId)}/transactions?limit=${limit}`);
+}
+
+export async function fetchStockMovements(storeId: string, limit = 100) {
+  return apiRequest<any[]>(`/api/stores/${encodeURIComponent(storeId)}/stock-movements?limit=${limit}`);
 }
 
 export async function addProduct(storeId: string, productData: any) {
-  const productId = `prod-${Date.now()}`;
-  const now = Date.now();
-  await setDoc(doc(db, `stores/${storeId}/products`, productId), {
-    ...productData,
-    createdAt: now,
-    updatedAt: now
+  const result = await apiRequest<{ id: string }>(`/api/stores/${encodeURIComponent(storeId)}/products`, {
+    method: 'POST',
+    body: productData,
   });
-  return productId;
+
+  return result.id;
 }
 
 export async function updateProduct(storeId: string, productId: string, productData: any) {
-  const now = Date.now();
-  await setDoc(doc(db, `stores/${storeId}/products`, productId), {
-    ...productData,
-    updatedAt: now
-  }, { merge: true });
+  await apiRequest<void>(
+    `/api/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}`,
+    {
+      method: 'PATCH',
+      body: productData,
+    }
+  );
 }
-
-export async function recordTransaction(
-  storeId: string, 
-  cashierId: string, 
-  type: 'sale' | 'stock_in', 
-  items: any[], 
-  totalAmount: number,
-  notes: string = ''
-) {
-  const transactionId = `txn-${Date.now()}`;
-  const now = Date.now();
-  
-  const batch = writeBatch(db);
-
-  // 1. Create Transaction
-  const txnRef = doc(db, `stores/${storeId}/transactions`, transactionId);
-  batch.set(txnRef, {
-    type,
-    items,
-    totalAmount,
-    cashierId,
-    notes,
-    createdAt: now
-  });
-
-  // 2. Map items and perform stock updates & movements
-  for (const item of items) {
-    const movementId = `mov-${Date.now()}-${item.productId}`;
-    const movRef = doc(db, `stores/${storeId}/stock_movements`, movementId);
-    
-    batch.set(movRef, {
-      productId: item.productId,
-      type,
-      quantity: item.quantity,
-      notes: type === 'sale' ? `Penjualan: ${notes}` : `Stock in: ${notes}`,
-      createdAt: now
-    });
-
-    // Update product stock (note: ideally we read current stock and update, 
-    // but in a batch, Firestore doesn't provide a way to read then write seamlessly without a full transaction.
-    // However, since we just query before UI, we will apply the delta here via an update.)
-    // Wait, let's use client-side computed updated-stock passed to this function, or do a transaction.
-    // To keep rules simple and avoid transaction complexities for now, we will expect caller to provide NEW stock value
-  }
-
-  await batch.commit();
-  return transactionId;
-}
-
-// Transaction function that increments/decrements safely
-import { runTransaction } from 'firebase/firestore';
 
 export async function processSaleOrStockIn(
   storeId: string,
   cashierId: string,
   type: 'sale' | 'stock_in',
-  items: any[], // { productId, productName, quantity, price, subtotal }
+  items: any[],
   totalAmount: number,
-  notes: string = ''
+  notes = ''
 ) {
-  const transactionId = `txn-${Date.now()}`;
-  const now = Date.now();
-
-  await runTransaction(db, async (t) => {
-    // Phase 1: Reads
-    const productRefsAndData = await Promise.all(
-      items.map(async (item) => {
-        const ref = doc(db, `stores/${storeId}/products`, item.productId);
-        const docSnap = await t.get(ref);
-        if (!docSnap.exists()) throw new Error("Product not found");
-        return { ref, data: docSnap.data(), item };
-      })
-    );
-
-    // Phase 2: Logic checks
-    if (type === 'sale') {
-      for (const p of productRefsAndData) {
-        if (p.data.stock < p.item.quantity) {
-          throw new Error(`Stok tidak mencukupi untuk: ${p.data.name}`);
-        }
-      }
-    }
-
-    // Phase 3: Writes
-    // Create transaction
-    const txnRef = doc(db, `stores/${storeId}/transactions`, transactionId);
-    t.set(txnRef, {
-      type,
-      items,
-      totalAmount,
-      cashierId,
-      notes,
-      createdAt: now
-    });
-
-    for (const p of productRefsAndData) {
-      // Stock movement
-      const movementId = `mov-${Date.now()}-${p.item.productId}-${Math.floor(Math.random()*1000)}`;
-      const movRef = doc(db, `stores/${storeId}/stock_movements`, movementId);
-      t.set(movRef, {
-        productId: p.item.productId,
+  const result = await apiRequest<{ id: string }>(
+    `/api/stores/${encodeURIComponent(storeId)}/transactions/process`,
+    {
+      method: 'POST',
+      body: {
+        cashierId,
         type,
-        quantity: p.item.quantity,
-        notes: notes || (type === 'sale' ? 'Penjualan kasir' : 'Barang masuk'),
-        createdAt: now
-      });
-
-      // Stock update
-      const newStock = type === 'sale' 
-        ? p.data.stock - p.item.quantity 
-        : p.data.stock + p.item.quantity;
-      
-      t.update(p.ref, {
-        stock: newStock,
-        updatedAt: now
-      });
+        items,
+        totalAmount,
+        notes,
+      },
     }
-  });
+  );
 
-  return transactionId;
+  return result.id;
 }
-

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { createStore } from '../lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,17 +16,8 @@ export default function StoreSetup() {
 
     setLoading(true);
     try {
-      const storeId = `store-${Date.now()}`;
-      // Create store doc
-      await setDoc(doc(db, 'stores', storeId), {
-        name: storeName,
-        ownerId: currentUser.uid,
-        createdAt: Date.now()
-      });
-      
-      // Update user with storeId
-      await updateProfile({ storeId });
-      
+      const store = await createStore(storeName, currentUser.uid);
+      await updateProfile({ storeId: store.id });
     } catch (error) {
       console.error(error);
       alert('Gagal membuat toko. Cek koneksi Anda.');

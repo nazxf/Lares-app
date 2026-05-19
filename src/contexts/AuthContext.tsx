@@ -1,84 +1,73 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut } from 'firebase/auth';
-import { auth, db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-
-interface UserProfile {
-  email: string;
-  name: string;
-  role: 'owner' | 'cashier';
-  storeId?: string;
-  createdAt: number;
-}
+import {
+  fetchUserProfile,
+  LocalUser,
+  loginWithSql,
+  updateUserProfile,
+  UserProfile,
+} from '../lib/db';
 
 interface AuthContextType {
-  currentUser: User | null;
+  currentUser: LocalUser | null;
   userProfile: UserProfile | null;
   loading: boolean;
-  signIn: () => Promise<void>;
+  signIn: (email: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (profile: Partial<UserProfile>) => Promise<void>;
 }
 
+const LOCAL_USER_KEY = 'lares.localUserId';
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-      if (user) {
-        // Fetch or create user profile
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            setUserProfile(userDoc.data() as UserProfile);
-          } else {
-            // Create minimal user
-            const newUser: UserProfile = {
-              email: user.email || '',
-              name: user.displayName || 'New User',
-              role: 'owner', // Default role for new signups
-              createdAt: Date.now()
-            };
-            await setDoc(doc(db, 'users', user.uid), newUser);
-            setUserProfile(newUser);
-          }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-        }
-      } else {
-        setUserProfile(null);
+    const restoreSession = async () => {
+      const savedUserId = localStorage.getItem(LOCAL_USER_KEY);
+      if (!savedUserId) {
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-    });
 
-    return unsubscribe;
+      try {
+        const { currentUser: restoredUser, profile } = await fetchUserProfile(savedUserId);
+        setCurrentUser(restoredUser);
+        setUserProfile(profile);
+      } catch (error) {
+        console.error('Error restoring local SQL session:', error);
+        localStorage.removeItem(LOCAL_USER_KEY);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    restoreSession();
   }, []);
 
-  const signIn = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+  const signIn = async (email: string, name: string) => {
+    const { currentUser: user, profile } = await loginWithSql(email, name);
+    localStorage.setItem(LOCAL_USER_KEY, user.uid);
+    setCurrentUser(user);
+    setUserProfile(profile);
   };
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    localStorage.removeItem(LOCAL_USER_KEY);
+    setCurrentUser(null);
+    setUserProfile(null);
   };
 
   const updateProfile = async (profileUpdate: Partial<UserProfile>) => {
     if (!currentUser) return;
-    try {
-      await setDoc(doc(db, 'users', currentUser.uid), profileUpdate, { merge: true });
-      setUserProfile((prev) => prev ? { ...prev, ...profileUpdate } : null);
-    } catch (error) {
-      console.error("Error updating profile", error);
-      throw error;
-    }
+
+    const { currentUser: updatedUser, profile } = await updateUserProfile(currentUser.uid, profileUpdate);
+    setCurrentUser(updatedUser);
+    setUserProfile(profile);
   };
 
   return (

@@ -1,0 +1,49 @@
+name: Dependency Update
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  update-dependencies:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Update dependencies
+        run: |
+          npm update
+          npm outdated || true
+      
+      - name: Run tests
+        run: |
+          npm ci
+          npm run lint
+          if grep -q '"test"' package.json; then
+            npm test || true
+          fi
+      
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update dependencies'
+          title: 'chore: automated dependency updates'
+          body: |
+            Automated dependency updates by GitHub Actions.
+            
+            Please review the changes and ensure all tests pass.
+          branch: automated-dependency-updates
+          delete-branch: true

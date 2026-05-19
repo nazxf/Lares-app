@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { fetchStoreProducts } from '../lib/db';
+import { fetchStockMovements, fetchStoreProducts } from '../lib/db';
 import { format } from 'date-fns';
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 
@@ -23,13 +21,8 @@ export default function StockMovements() {
         prodData.forEach(p => prodMap[p.id] = p.name);
         setProducts(prodMap);
 
-        const q = query(
-          collection(db, `stores/${userProfile.storeId}/stock_movements`),
-          orderBy('createdAt', 'desc'),
-          limit(100)
-        );
-        const snapshot = await getDocs(q);
-        setMovements(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        const movementData = await fetchStockMovements(userProfile.storeId, 100);
+        setMovements(movementData);
       } catch (err) {
         console.error(err);
       } finally {
