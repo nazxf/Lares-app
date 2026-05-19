@@ -5,6 +5,7 @@ import type { Database } from 'sql.js';
 import NodeCache from 'node-cache';
 import { normalizeOptionalString, normalizeRequiredString, numberFrom } from './validators.js';
 import { rowToUser, rowToProduct, rowToTransaction, rowToMovement } from './mappers.js';
+import { buildDashboardSummary, getDashboardRange } from './dashboard-summary.js';
 
 type SqlValue = string | number | null;
 
@@ -382,6 +383,48 @@ export class SqlStore {
     ).map(rowToTransaction);
   }
 
+  getDashboardSummary(storeId: string, timezoneOffsetInput: unknown = 0) {
+    const timezoneOffset = numberFrom(timezoneOffsetInput, 0);
+    const { weekStart, tomorrowStart } = getDashboardRange(timezoneOffset);
+    const cacheKey = this.getCacheKey('dashboard', storeId, timezoneOffset);
+    const cached = this.getCached<ReturnType<typeof buildDashboardSummary>>(cacheKey);
+    if (cached) return cached;
+
+    const products = this.query(
+      `SELECT id, name, category, stock, minimum_stock as minimumStock,
+              unit_type as unitType
+       FROM products
+       WHERE store_id = ?`,
+      [storeId]
+    ).map(row => ({
+      id: String(row.id),
+      name: String(row.name),
+      category: String(row.category),
+      stock: Number(row.stock),
+      minimumStock: Number(row.minimumStock),
+      unitType: String(row.unitType || ''),
+    }));
+
+    const transactions = this.query(
+      `SELECT type, total_amount as totalAmount, created_at as createdAt
+       FROM transactions
+       WHERE store_id = ?
+         AND type = 'sale'
+         AND created_at >= ?
+         AND created_at < ?
+       ORDER BY created_at ASC`,
+      [storeId, weekStart, tomorrowStart]
+    ).map(row => ({
+      type: String(row.type),
+      totalAmount: Number(row.totalAmount),
+      createdAt: Number(row.createdAt),
+    }));
+
+    const result = buildDashboardSummary(products, transactions, timezoneOffset);
+    this.setCached(cacheKey, result, 30);
+    return result;
+  }
+
   processTransaction(storeId: string, data: Record<string, unknown>) {
     const cashierId = normalizeRequiredString(data.cashierId, 'Cashier ID');
     const type = normalizeRequiredString(data.type, 'Tipe transaksi');
@@ -461,6 +504,67 @@ export class SqlStore {
     }
 
     return transactionId;
+  }
+
+  createStockMovement(storeId: string, data: Record<string, unknown>) {
+    const productId = normalizeRequiredString(data.productId, 'Produk');
+    const type = normalizeRequiredString(data.type, 'Tipe stok');
+    const quantity = numberFrom(data.quantity);
+    const notes = normalizeOptionalString(data.notes) ?? '';
+
+    if (!['in', 'out'].includes(type)) {
+      const error = new Error('Tipe stok tidak valid');
+      Object.assign(error, { status: 400 });
+      throw error;
+    }
+
+    if (quantity <= 0) {
+      const error = new Error('Jumlah harus lebih dari 0');
+      Object.assign(error, { status: 400 });
+      throw error;
+    }
+
+    const product = this.one(
+      `SELECT stock FROM products WHERE id = ? AND store_id = ?`,
+      [productId, storeId]
+    );
+
+    if (!product) {
+      const error = new Error('Produk tidak ditemukan');
+      Object.assign(error, { status: 404 });
+      throw error;
+    }
+
+    const now = Date.now();
+    const currentStock = Number(product.stock);
+    const nextStock = type === 'in' ? currentStock + quantity : currentStock - quantity;
+
+    if (nextStock < 0) {
+      const error = new Error('Stok tidak mencukupi');
+      Object.assign(error, { status: 400 });
+      throw error;
+    }
+
+    const movementId = `mov-${randomUUID()}`;
+    this.run('BEGIN TRANSACTION');
+    try {
+      this.run(
+        `UPDATE products SET stock = ?, updated_at = ? WHERE id = ? AND store_id = ?`,
+        [nextStock, now, productId, storeId]
+      );
+      this.run(
+        `INSERT INTO stock_movements (id, store_id, product_id, type, quantity, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [movementId, storeId, productId, type, quantity, notes, now]
+      );
+      this.run('COMMIT');
+      this.save();
+    } catch (error) {
+      this.run('ROLLBACK');
+      throw error;
+    }
+
+    return { id: movementId, storeId, productId, type, quantity, notes, createdAt: now };
   }
 
   // Stock movement methods

@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchStoreProducts, addProduct, updateProduct, addStockMovement } from '../lib/db';
+import { addStockMovement } from '../lib/db';
+import { useProducts } from '@/hooks/useProducts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,8 +16,7 @@ const formatCurrency = (val: number) => `Rp ${val.toLocaleString('id-ID')}`;
 
 export default function Products() {
   const { userProfile } = useAuth();
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { products, loading, loadProducts, addProduct, updateProduct } = useProducts(userProfile?.storeId);
   const [search, setSearch] = useState('');
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -27,51 +27,31 @@ export default function Products() {
   const [stockProduct, setStockProduct] = useState<any>(null);
   const [stockType, setStockType] = useState<'in' | 'out'>('in');
 
-  useEffect(() => {
-    loadProducts();
-  }, [userProfile]);
-
-  const loadProducts = async () => {
-    if (!userProfile?.storeId) return;
-    setLoading(true);
-    try {
-      const prods = await fetchStoreProducts(userProfile.storeId);
-      setProducts(prods);
-    } catch (e) {
-      toast.error('Gagal memuat produk');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!userProfile?.storeId) return;
 
     const fd = new FormData(e.currentTarget);
     const data = {
-      name: fd.get('name'),
-      category: fd.get('category'),
+      name: String(fd.get('name') || ''),
+      category: String(fd.get('category') || 'Water'),
       sellingPrice: Number(fd.get('sellingPrice')),
       purchasePrice: Number(fd.get('purchasePrice')),
       stock: editingProduct ? editingProduct.stock : Number(fd.get('stock')),
       minimumStock: Number(fd.get('minimumStock')),
-      unitType: fd.get('unitType'),
-      status: fd.get('status') || 'active'
+      unitType: String(fd.get('unitType') || 'Unit'),
+      status: (fd.get('status') || 'active') as 'active' | 'inactive'
     };
 
     try {
       if (editingProduct) {
-        await updateProduct(userProfile.storeId, editingProduct.id, data);
-        toast.success('Produk diperbarui');
+        await updateProduct(editingProduct.id, data);
       } else {
-        await addProduct(userProfile.storeId, data);
-        toast.success('Produk ditambahkan');
+        await addProduct(data);
       }
       setIsDialogOpen(false);
-      loadProducts();
     } catch (err: any) {
-      toast.error(err.message || 'Terjadi kesalahan');
+      console.error(err);
     }
   };
 

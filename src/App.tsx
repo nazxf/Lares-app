@@ -1,20 +1,30 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Toaster } from '@/components/ui/sonner';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
-// Lazy loading pages could be done, but for simplicity we will import them directly or just stub them out for now
 import LoginPage from './pages/Login';
 import DashboardLayout from './layouts/DashboardLayout';
-import Dashboard from './pages/Dashboard';
-import Products from './pages/Products';
-import StockIn from './pages/StockIn';
-import Sales from './pages/Sales';
-import StockMovements from './pages/StockMovements';
-import Reports from './pages/Reports';
-import Settings from './pages/Settings';
 import StoreSetup from './pages/StoreSetup';
+
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const Products = React.lazy(() => import('./pages/Products'));
+const StockIn = React.lazy(() => import('./pages/StockIn'));
+const Sales = React.lazy(() => import('./pages/Sales'));
+const StockMovements = React.lazy(() => import('./pages/StockMovements'));
+const Reports = React.lazy(() => import('./pages/Reports'));
+const Settings = React.lazy(() => import('./pages/Settings'));
+
+function PageFallback() {
+  return (
+    <div className="p-6 w-full max-w-[1600px] mx-auto space-y-4 animate-pulse">
+      <div className="h-8 w-40 rounded-lg bg-slate-200" />
+      <div className="h-4 w-72 max-w-full rounded bg-slate-100" />
+      <div className="h-72 rounded-3xl bg-white border border-slate-100 shadow-sm" />
+    </div>
+  );
+}
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser, loading, userProfile } = useAuth();
@@ -34,26 +44,28 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <DashboardLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="products" element={<Products />} />
-              <Route path="stock-in" element={<StockIn />} />
-              <Route path="sales" element={<Sales />} />
-              <Route path="stock-movements" element={<StockMovements />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="settings" element={<Settings />} />
-            </Route>
-          </Routes>
+          <Suspense fallback={<PageFallback />}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="products" element={<Products />} />
+                <Route path="stock-in" element={<StockIn />} />
+                <Route path="sales" element={<Sales />} />
+                <Route path="stock-movements" element={<StockMovements />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="settings" element={<Settings />} />
+              </Route>
+            </Routes>
+          </Suspense>
           <Toaster />
         </BrowserRouter>
       </AuthProvider>

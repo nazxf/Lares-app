@@ -1,3 +1,5 @@
+import type { DashboardSummary } from '@/types';
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -99,6 +101,16 @@ export async function fetchStoreProducts(storeId: string) {
 
 export async function fetchStoreTransactions(storeId: string, limit = 50) {
   return apiRequest<any[]>(`/api/stores/${encodeURIComponent(storeId)}/transactions?limit=${limit}`);
+}
+
+export async function fetchDashboardSummary(
+  storeId: string,
+  timezoneOffset = new Date().getTimezoneOffset()
+) {
+  const query = new URLSearchParams({ tzOffset: String(timezoneOffset) });
+  return apiRequest<DashboardSummary>(
+    `/api/stores/${encodeURIComponent(storeId)}/dashboard?${query.toString()}`
+  );
 }
 
 export async function fetchStockMovements(storeId: string, limit = 100) {

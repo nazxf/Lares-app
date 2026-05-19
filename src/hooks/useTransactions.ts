@@ -1,30 +1,38 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import useSWR from 'swr';
 import { Transaction } from '@/types';
 import { fetchStoreTransactions, processSaleOrStockIn } from '../lib/db';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants';
 
 export function useTransactions(storeId?: string, limit: number = 50) {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  type TransactionsKey = ['transactions', string, number];
+  const {
+    data,
+    error,
+    isLoading,
+    isValidating,
+    mutate,
+  } = useSWR<Transaction[], Error, TransactionsKey | null>(
+    storeId ? ['transactions', storeId, limit] : null,
+    ([, id, transactionLimit]: TransactionsKey) => fetchStoreTransactions(id, transactionLimit),
+    {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+      dedupingInterval: 15_000,
+      onError: err => {
+        const message = err instanceof Error ? err.message : TOAST_MESSAGES.ERROR.LOAD_TRANSACTIONS;
+        toast.error(message);
+      },
+    }
+  );
+
+  const transactions = data ?? [];
 
   const loadTransactions = useCallback(async () => {
     if (!storeId) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchStoreTransactions(storeId, limit);
-      setTransactions(data);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : TOAST_MESSAGES.ERROR.LOAD_TRANSACTIONS;
-      setError(message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [storeId, limit]);
+    await mutate();
+  }, [storeId, mutate]);
 
   const processTransaction = useCallback(async (
     cashierId: string,
@@ -43,13 +51,13 @@ export function useTransactions(storeId?: string, limit: number = 50) {
     try {
       await processSaleOrStockIn(storeId, cashierId, type, items, totalAmount, notes);
       toast.success(TOAST_MESSAGES.SUCCESS.TRANSACTION_PROCESSED);
-      await loadTransactions();
+      await mutate();
     } catch (err) {
       const message = err instanceof Error ? err.message : TOAST_MESSAGES.ERROR.PROCESS_TRANSACTION;
       toast.error(message);
       throw err;
     }
-  }, [storeId, loadTransactions]);
+  }, [storeId, mutate]);
 
   const getRecentTransactions = useCallback((count: number = 10): Transaction[] => {
     return transactions.slice(0, count);
@@ -65,14 +73,11 @@ export function useTransactions(storeId?: string, limit: number = 50) {
     return transactions.length;
   }, [transactions]);
 
-  useEffect(() => {
-    loadTransactions();
-  }, [loadTransactions]);
-
   return {
     transactions,
-    loading,
-    error,
+    loading: isLoading && transactions.length === 0,
+    refreshing: isValidating,
+    error: error ? (error instanceof Error ? error.message : TOAST_MESSAGES.ERROR.LOAD_TRANSACTIONS) : null,
     loadTransactions,
     processTransaction,
     getRecentTransactions,

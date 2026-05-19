@@ -88,6 +88,30 @@ export interface DashboardStats {
   recentTransactions: Transaction[];
 }
 
+export interface DashboardLowStockProduct {
+  id: string;
+  name: string;
+  category: string;
+  stock: number;
+  minimumStock: number;
+  unitType?: string;
+}
+
+export interface DashboardWeeklySales {
+  name: string;
+  sales: number;
+}
+
+export interface DashboardSummary {
+  omzetHariIni: number;
+  todaySalesCount: number;
+  totalWaterStock: number;
+  totalGasStock: number;
+  lowStockProducts: DashboardLowStockProduct[];
+  weeklySalesData: DashboardWeeklySales[];
+  generatedAt: number;
+}
+
 // API Request/Response types
 export interface LoginRequest {
   email: string;

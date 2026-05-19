@@ -1,6 +1,54 @@
 import type { Express, Request, Response, NextFunction } from 'express';
 import type { NeonStore } from './neon-store.js';
 
+function parseLimit(value: unknown, fallback: number) {
+  const limit = Number(value ?? fallback);
+  if (!Number.isFinite(limit)) return fallback;
+  return Math.min(Math.max(Math.trunc(limit), 1), 500);
+}
+
+function parseTimezoneOffset(value: unknown) {
+  const offset = Number(value ?? 0);
+  if (!Number.isFinite(offset)) return 0;
+  return Math.min(Math.max(Math.trunc(offset), -840), 840);
+}
+
+async function listProducts(store: any, storeId: string) {
+  if (typeof store.getProducts === 'function') return store.getProducts(storeId);
+  return store.listProducts(storeId);
+}
+
+async function createProduct(store: any, storeId: string, body: any) {
+  if (typeof store.createProduct === 'function') return store.createProduct(storeId, body);
+  const id = store.addProduct(storeId, body);
+  return { id };
+}
+
+async function updateProduct(store: any, storeId: string, productId: string, body: any) {
+  if (store.updateProduct.length >= 3) return store.updateProduct(storeId, productId, body);
+  return store.updateProduct(productId, body);
+}
+
+async function listTransactions(store: any, storeId: string, filters: any) {
+  if (typeof store.getTransactions === 'function') return store.getTransactions(storeId, filters);
+  return store.listTransactions(storeId, filters.limit);
+}
+
+async function processTransaction(store: any, storeId: string, body: any) {
+  const result = await store.processTransaction(storeId, body);
+  return typeof result === 'string' ? { id: result } : result;
+}
+
+async function createTransaction(store: any, storeId: string, body: any) {
+  if (typeof store.createTransaction === 'function') return store.createTransaction(storeId, body);
+  return processTransaction(store, storeId, body);
+}
+
+async function listStockMovements(store: any, storeId: string, filters: any) {
+  if (typeof store.getStockMovements === 'function') return store.getStockMovements(storeId, filters);
+  return store.listMovements(storeId, filters.limit);
+}
+
 export function registerApiRoutes(app: Express, store: any) {
   // Performance monitoring middleware
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
@@ -26,6 +74,13 @@ export function registerApiRoutes(app: Express, store: any) {
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
     next();
+  });
+
+  app.get('/api/health', (_req: Request, res: Response) => {
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+    });
   });
 
   // Auth routes
@@ -83,7 +138,7 @@ export function registerApiRoutes(app: Express, store: any) {
   // Product routes
   app.get('/api/stores/:storeId/products', async (req: Request, res: Response) => {
     try {
-      const products = await store.getProducts(req.params.storeId);
+      const products = await listProducts(store, req.params.storeId);
       res.json(products);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -92,7 +147,7 @@ export function registerApiRoutes(app: Express, store: any) {
 
   app.post('/api/stores/:storeId/products', async (req: Request, res: Response) => {
     try {
-      const product = await store.createProduct(req.params.storeId, req.body);
+      const product = await createProduct(store, req.params.storeId, req.body);
       res.status(201).json(product);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -111,7 +166,7 @@ export function registerApiRoutes(app: Express, store: any) {
 
   app.patch('/api/stores/:storeId/products/:productId', async (req: Request, res: Response) => {
     try {
-      const product = await store.updateProduct(req.params.productId, req.body);
+      const product = await updateProduct(store, req.params.storeId, req.params.productId, req.body);
       if (!product) return res.status(404).json({ message: 'Product tidak ditemukan' });
       res.json(product);
     } catch (error: any) {
@@ -133,9 +188,9 @@ export function registerApiRoutes(app: Express, store: any) {
     try {
       const filters = {
         type: req.query.type as string,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : undefined
+        limit: req.query.limit ? parseLimit(req.query.limit, 50) : undefined
       };
-      const transactions = await store.getTransactions(req.params.storeId, filters);
+      const transactions = await listTransactions(store, req.params.storeId, filters);
       res.json(transactions);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -144,10 +199,19 @@ export function registerApiRoutes(app: Express, store: any) {
 
   app.post('/api/stores/:storeId/transactions', async (req: Request, res: Response) => {
     try {
-      const transaction = await store.createTransaction(req.params.storeId, req.body);
+      const transaction = await createTransaction(store, req.params.storeId, req.body);
       res.status(201).json(transaction);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/stores/:storeId/transactions/process', async (req: Request, res: Response) => {
+    try {
+      const transaction = await processTransaction(store, req.params.storeId, req.body);
+      res.status(201).json(transaction);
+    } catch (error: any) {
+      res.status(error.status ?? 500).json({ error: error.message });
     }
   });
 
@@ -156,9 +220,9 @@ export function registerApiRoutes(app: Express, store: any) {
     try {
       const filters = {
         productId: req.query.productId as string,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : undefined
+        limit: req.query.limit ? parseLimit(req.query.limit, 100) : undefined
       };
-      const movements = await store.getStockMovements(req.params.storeId, filters);
+      const movements = await listStockMovements(store, req.params.storeId, filters);
       res.json(movements);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -169,6 +233,18 @@ export function registerApiRoutes(app: Express, store: any) {
     try {
       const movement = await store.createStockMovement(req.params.storeId, req.body);
       res.status(201).json(movement);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/stores/:storeId/dashboard', async (req: Request, res: Response) => {
+    try {
+      const summary = await store.getDashboardSummary(
+        req.params.storeId,
+        parseTimezoneOffset(req.query.tzOffset)
+      );
+      res.json(summary);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

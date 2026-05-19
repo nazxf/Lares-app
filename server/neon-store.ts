@@ -1,12 +1,21 @@
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
 import { cache } from './redis.js';
+import { buildDashboardSummary, getDashboardRange } from './dashboard-summary.js';
 
 export class NeonStore {
   private sql: ReturnType<typeof neon>;
 
   constructor(connectionString: string) {
     this.sql = neon(connectionString);
+  }
+
+  private async invalidateStoreData(storeId: string) {
+    await cache.del(`products:${storeId}`);
+    await cache.delPattern(`transactions:${storeId}:*`);
+    await cache.delPattern(`movements:${storeId}:*`);
+    await cache.delPattern(`analytics:${storeId}:*`);
+    await cache.delPattern(`dashboard:${storeId}:*`);
   }
 
   // Auth methods
@@ -238,8 +247,7 @@ export class NeonStore {
       )
     ` as any[];
 
-    // Invalidate products cache
-    await cache.del(`products:${storeId}`);
+    await this.invalidateStoreData(storeId);
 
     return { id, ...data, storeId, createdAt: now, updatedAt: now };
   }
@@ -315,9 +323,8 @@ export class NeonStore {
 
     const product = await this.getProduct(productId);
     
-    // Invalidate products cache
     if (product) {
-      await cache.del(`products:${product.storeId}`);
+      await this.invalidateStoreData(product.storeId);
     }
 
     return product;
@@ -328,9 +335,8 @@ export class NeonStore {
     
     await this.sql`DELETE FROM products WHERE id = ${productId}` as any[];
     
-    // Invalidate products cache
     if (product) {
-      await cache.del(`products:${product.storeId}`);
+      await this.invalidateStoreData(product.storeId);
     }
     
     return { success: true };
@@ -350,9 +356,7 @@ export class NeonStore {
       )
     ` as any[];
 
-    // Invalidate transactions cache
-    await cache.del(`transactions:${storeId}:latest`);
-    await cache.del(`analytics:${storeId}:*`);
+    await this.invalidateStoreData(storeId);
 
     return { id, ...data, storeId, createdAt: now };
   }
@@ -410,6 +414,77 @@ export class NeonStore {
     return result;
   }
 
+  async processTransaction(storeId: string, data: any) {
+    const id = randomUUID();
+    const now = Date.now();
+    const type = data.type;
+    const items = Array.isArray(data.items) ? data.items : [];
+
+    if (!['sale', 'stock_in'].includes(type)) {
+      throw new Error('Tipe transaksi tidak valid');
+    }
+
+    if (items.length === 0) {
+      throw new Error('Items tidak boleh kosong');
+    }
+
+    for (const item of items) {
+      const productId = String(item.productId);
+      const quantity = Number(item.quantity);
+
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        throw new Error('Jumlah item tidak valid');
+      }
+
+      const products = await this.sql`
+        SELECT stock FROM products WHERE id = ${productId} AND store_id = ${storeId}
+      ` as any[];
+
+      if (products.length === 0) {
+        throw new Error(`Produk ${productId} tidak ditemukan`);
+      }
+
+      const currentStock = Number(products[0].stock);
+      const nextStock = type === 'sale' ? currentStock - quantity : currentStock + quantity;
+
+      if (type === 'sale' && nextStock < 0) {
+        throw new Error(`Stok produk ${productId} tidak mencukupi`);
+      }
+
+      await this.sql`
+        UPDATE products
+        SET stock = ${nextStock}, updated_at = ${now}
+        WHERE id = ${productId} AND store_id = ${storeId}
+      ` as any[];
+
+      await this.sql`
+        INSERT INTO stock_movements (id, store_id, product_id, type, quantity, notes, created_at)
+        VALUES (
+          ${randomUUID()},
+          ${storeId},
+          ${productId},
+          ${type},
+          ${quantity},
+          ${data.notes || (type === 'sale' ? 'Penjualan kasir' : 'Barang masuk')},
+          ${now}
+        )
+      ` as any[];
+    }
+
+    await this.sql`
+      INSERT INTO transactions (
+        id, store_id, type, items_json, total_amount, cashier_id, notes, created_at
+      ) VALUES (
+        ${id}, ${storeId}, ${type}, ${JSON.stringify(items)},
+        ${data.totalAmount}, ${data.cashierId}, ${data.notes || null}, ${now}
+      )
+    ` as any[];
+
+    await this.invalidateStoreData(storeId);
+
+    return { id, ...data, storeId, createdAt: now };
+  }
+
   // Stock movement methods
   async createStockMovement(storeId: string, data: any) {
     const id = randomUUID();
@@ -437,9 +512,7 @@ export class NeonStore {
       ` as any[];
     }
 
-    // Invalidate caches
-    await cache.del(`products:${storeId}`);
-    await cache.del(`movements:${storeId}:latest`);
+    await this.invalidateStoreData(storeId);
 
     return { id, ...data, storeId, createdAt: now };
   }
@@ -493,6 +566,50 @@ export class NeonStore {
     // Cache for 1 minute
     await cache.set(cacheKey, result, 60);
     
+    return result;
+  }
+
+  async getDashboardSummary(storeId: string, timezoneOffset = 0) {
+    const { weekStart, tomorrowStart } = getDashboardRange(timezoneOffset);
+    const cacheKey = `dashboard:${storeId}:${timezoneOffset}`;
+    const cached = await cache.get<any>(cacheKey);
+    if (cached) return cached;
+
+    const products = await this.sql`
+      SELECT id, name, category, stock, minimum_stock, unit_type
+      FROM products
+      WHERE store_id = ${storeId}
+    ` as any[];
+
+    const transactions = await this.sql`
+      SELECT type, total_amount, created_at
+      FROM transactions
+      WHERE store_id = ${storeId}
+        AND type = 'sale'
+        AND created_at >= ${weekStart}
+        AND created_at < ${tomorrowStart}
+      ORDER BY created_at ASC
+    ` as any[];
+
+    const result = buildDashboardSummary(
+      products.map(product => ({
+        id: product.id,
+        name: product.name,
+        category: product.category,
+        stock: Number(product.stock),
+        minimumStock: Number(product.minimum_stock),
+        unitType: product.unit_type,
+      })),
+      transactions.map(transaction => ({
+        type: transaction.type,
+        totalAmount: Number(transaction.total_amount),
+        createdAt: Number(transaction.created_at),
+      })),
+      timezoneOffset
+    );
+
+    await cache.set(cacheKey, result, 30);
+
     return result;
   }
 

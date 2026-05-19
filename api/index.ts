@@ -1,6 +1,7 @@
 import express from 'express';
 import { NeonStore } from '../server/neon-store.js';
 import { registerApiRoutes } from '../server/routes.js';
+import { cache } from '../server/redis.js';
 
 const app = express();
 
@@ -37,7 +38,8 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    database: process.env.POSTGRES_URL ? 'neon-postgres' : 'not-configured'
+    database: process.env.POSTGRES_URL ? 'neon-postgres' : 'not-configured',
+    redis: cache.isEnabled() ? 'enabled' : 'disabled'
   });
 });
 
