@@ -142,11 +142,11 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[350px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Chart */}
-        <div className="col-span-1 lg:col-span-8 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col">
+        <div className="col-span-1 lg:col-span-8 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
           <h4 className="font-bold text-slate-800 mb-6 text-sm sm:text-base">Grafik Penjualan (7 Hari Terakhir)</h4>
-          <div className="flex-1 w-full min-h-[200px]">
+          <div className="w-full h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weeklySalesData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -160,9 +160,9 @@ export default function Dashboard() {
         </div>
 
         {/* Low Stock Alerts */}
-        <div className="col-span-1 lg:col-span-4 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col">
+        <div className="col-span-1 lg:col-span-4 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
           <h4 className="font-bold text-slate-800 mb-4 text-sm sm:text-base">Stok Menipis</h4>
-          <div className="space-y-4 flex-1 overflow-y-auto pr-2">
+          <div className="space-y-4 max-h-[280px] overflow-y-auto pr-2">
             {lowStockProducts.map(item => {
               const critical = item.stock <= (item.minimumStock / 2);
               const percent = Math.max(2, (item.stock / (item.minimumStock * 2 || 1)) * 100);
