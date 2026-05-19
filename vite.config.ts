@@ -12,6 +12,10 @@ export default defineConfig(({mode}) => {
     },
     resolve: {
       alias: {
+        '@/hooks': path.resolve(__dirname, './src/hooks'),
+        '@/contexts': path.resolve(__dirname, './src/contexts'),
+        '@/lib': path.resolve(__dirname, './src/lib'),
+        '@/pages': path.resolve(__dirname, './src/pages'),
         '@': path.resolve(__dirname, '.'),
       },
     },

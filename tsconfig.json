@@ -17,8 +17,19 @@
     "jsx": "react-jsx",
     "paths": {
       "@/*": [
-        "./src/*",
         "./*"
+      ],
+      "@/hooks/*": [
+        "./src/hooks/*"
+      ],
+      "@/contexts/*": [
+        "./src/contexts/*"
+      ],
+      "@/lib/*": [
+        "./src/lib/*"
+      ],
+      "@/pages/*": [
+        "./src/pages/*"
       ]
     },
     "allowImportingTsExtensions": true,
