@@ -14,7 +14,7 @@ export class NeonStore {
       // Check if user exists
       const users = await this.sql`
         SELECT * FROM users WHERE email = ${email}
-      `;
+      ` as any[];
 
       if (users.length > 0) {
         return {
@@ -52,7 +52,7 @@ export class NeonStore {
 
   // User methods
   async getUser(userId: string) {
-    const users = await this.sql`SELECT * FROM users WHERE id = ${userId}`;
+    const users = await this.sql`SELECT * FROM users WHERE id = ${userId}` as any[];
     if (users.length === 0) return null;
     
     return {
@@ -72,7 +72,7 @@ export class NeonStore {
         SET name = ${data.name}, store_id = ${data.storeId}
         WHERE id = ${userId}
         RETURNING *
-      `;
+      ` as any[];
       if (result.length === 0) return null;
       return {
         id: result[0].id,
@@ -88,7 +88,7 @@ export class NeonStore {
         SET name = ${data.name}
         WHERE id = ${userId}
         RETURNING *
-      `;
+      ` as any[];
       if (result.length === 0) return null;
       return {
         id: result[0].id,
@@ -104,7 +104,7 @@ export class NeonStore {
         SET store_id = ${data.storeId}
         WHERE id = ${userId}
         RETURNING *
-      `;
+      ` as any[];
       if (result.length === 0) return null;
       return {
         id: result[0].id,
@@ -137,7 +137,7 @@ export class NeonStore {
   }
 
   async getStore(storeId: string) {
-    const stores = await this.sql`SELECT * FROM stores WHERE id = ${storeId}`;
+    const stores = await this.sql`SELECT * FROM stores WHERE id = ${storeId}` as any[];
     if (stores.length === 0) return null;
     
     return {
@@ -178,7 +178,7 @@ export class NeonStore {
   async getProducts(storeId: string) {
     const products = await this.sql`
       SELECT * FROM products WHERE store_id = ${storeId} ORDER BY updated_at DESC
-    `;
+    ` as any[];
     
     return products.map(p => ({
       id: p.id,
@@ -197,7 +197,7 @@ export class NeonStore {
   }
 
   async getProduct(productId: string) {
-    const products = await this.sql`SELECT * FROM products WHERE id = ${productId}`;
+    const products = await this.sql`SELECT * FROM products WHERE id = ${productId}` as any[];
     if (products.length === 0) return null;
     
     const p = products[0];
@@ -390,3 +390,4 @@ export class NeonStore {
     };
   }
 }
+

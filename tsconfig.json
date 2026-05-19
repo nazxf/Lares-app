@@ -30,6 +30,9 @@
       ],
       "@/pages/*": [
         "./src/pages/*"
+      ],
+      "@/types": [
+        "./src/types"
       ]
     },
     "allowImportingTsExtensions": true,

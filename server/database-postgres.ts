@@ -96,7 +96,7 @@ export class PostgresStore {
 
     const result = this.sql`
       SELECT * FROM users WHERE email = ${email}
-    `.then(rows => {
+    `.then((rows: any[]) => {
       if (rows.length === 0) {
         const id = randomUUID();
         const now = Date.now();
@@ -124,7 +124,7 @@ export class PostgresStore {
     const cached = this.cache.get(cacheKey);
     if (cached) return cached;
 
-    const rows = await this.sql`SELECT * FROM users WHERE id = ${userId}`;
+    const rows = await this.sql`SELECT * FROM users WHERE id = ${userId}` as any[];
     if (rows.length === 0) return null;
     
     const user = rowToUser(rows[0]);
@@ -153,7 +153,7 @@ export class PostgresStore {
       SET ${this.sql.unsafe(updates.join(', '))}
       WHERE id = ${userId}
       RETURNING *
-    `;
+    ` as any[];
 
     this.cache.del(`user:id:${userId}`);
     return rows.length > 0 ? rowToUser(rows[0]) : null;
@@ -168,7 +168,7 @@ export class PostgresStore {
       INSERT INTO stores (id, name, owner_id, created_at)
       VALUES (${id}, ${name}, ${ownerId}, ${now})
       RETURNING *
-    `;
+    ` as any[];
 
     await this.sql`
       UPDATE users SET store_id = ${id} WHERE id = ${ownerId}
@@ -179,7 +179,7 @@ export class PostgresStore {
   }
 
   async getStore(storeId: string) {
-    const rows = await this.sql`SELECT * FROM stores WHERE id = ${storeId}`;
+    const rows = await this.sql`SELECT * FROM stores WHERE id = ${storeId}` as any[];
     if (rows.length === 0) return null;
     
     const row = rows[0];
@@ -197,3 +197,4 @@ export class PostgresStore {
 
 // Export both for compatibility
 export { PostgresStore as SqlStore };
+
