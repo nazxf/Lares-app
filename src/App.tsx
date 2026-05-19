@@ -14,7 +14,6 @@ import StockMovements from './pages/StockMovements';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import StoreSetup from './pages/StoreSetup';
-import Debts from './pages/Debts';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser, loading, userProfile } = useAuth();
@@ -48,7 +47,6 @@ export default function App() {
             <Route path="products" element={<Products />} />
             <Route path="stock-in" element={<StockIn />} />
             <Route path="sales" element={<Sales />} />
-            <Route path="debts" element={<Debts />} />
             <Route path="stock-movements" element={<StockMovements />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />

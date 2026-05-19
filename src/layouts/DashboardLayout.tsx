@@ -11,8 +11,7 @@ import {
   Droplet,
   LogOut,
   Menu,
-  X,
-  CreditCard
+  X
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -26,7 +25,6 @@ export default function DashboardLayout() {
     { to: '/products', icon: Package, label: 'Produk' },
     { to: '/stock-in', icon: ArrowDownToLine, label: 'Stok Masuk' },
     { to: '/sales', icon: LineChart, label: 'Penjualan' },
-    { to: '/debts', icon: CreditCard, label: 'Utang / Piutang' },
     { to: '/stock-movements', icon: Package, label: 'Riwayat Stok' },
     { to: '/reports', icon: FileText, label: 'Laporan' },
     { to: '/settings', icon: Settings, label: 'Pengaturan' },
