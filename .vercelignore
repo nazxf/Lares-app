@@ -1,0 +1,7 @@
+node_modules
+.git
+.env
+*.log
+.codex-dev.err.log
+.codex-dev.out.log
+dev.log
