@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchStoreProducts, addProduct, updateProduct } from '../lib/db';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
+import Fuse from 'fuse.js';
 
 const formatCurrency = (val: number) => `Rp ${val.toLocaleString('id-ID')}`;
 
@@ -79,7 +80,15 @@ export default function Products() {
     setIsDialogOpen(true);
   };
 
-  const filteredProducts = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+  const fuse = useMemo(() => new Fuse(products, {
+    keys: ['name', 'category'],
+    threshold: 0.3,
+  }), [products]);
+
+  const filteredProducts = useMemo(() => {
+    if (!search.trim()) return products;
+    return fuse.search(search).map(result => result.item);
+  }, [search, fuse, products]);
 
   return (
     <div className="p-6 w-full max-w-[1600px] mx-auto space-y-6">
@@ -93,11 +102,21 @@ export default function Products() {
           <div className="relative flex-1 sm:w-64">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input 
-              placeholder="Cari produk..." 
+              placeholder="Cari produk (nama, kategori)..." 
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-9 h-10 w-full rounded-xl bg-white border-slate-200"
+              className="pl-9 pr-9 h-10 w-full rounded-xl bg-white border-slate-200 focus-visible:ring-blue-500 transition-all font-medium"
             />
+            {search && (
+              <button 
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+              >
+                <div className="w-4 h-4 rounded-full bg-slate-100 flex items-center justify-center">
+                  <span className="text-[10px] font-bold">✕</span>
+                </div>
+              </button>
+            )}
           </div>
           <Button onClick={openAdd} className="h-10 rounded-xl px-4 gap-2 shrink-0">
             <Plus className="w-4 h-4" />

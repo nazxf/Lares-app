@@ -1,0 +1,91 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Store {
+  id             String   @id @default(uuid())
+  name           String
+  ownerId        String
+  createdAt      DateTime @default(now())
+
+  products       Product[]
+  transactions   Transaction[]
+  debts          Debt[]
+  stockMovements StockMovement[]
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  storeId     String
+  name        String
+  category    String
+  buyPrice    Float
+  sellPrice   Float
+  stock       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store       Store    @relation(fields: [storeId], references: [id])
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  storeId     String
+  cashierId   String
+  type        String   // "sale" | "stock_in"
+  totalAmount Float
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  store       Store    @relation(fields: [storeId], references: [id])
+  items       TransactionItem[]
+}
+
+model TransactionItem {
+  id            String   @id @default(uuid())
+  transactionId String
+  productId     String
+  productName   String
+  quantity      Int
+  price         Float
+  subtotal      Float
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+}
+
+model StockMovement {
+  id          String   @id @default(uuid())
+  storeId     String
+  productId   String
+  type        String   // "sale" | "stock_in"
+  quantity    Int
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  store       Store    @relation(fields: [storeId], references: [id])
+}
+
+model Debt {
+  id          String   @id @default(uuid())
+  storeId     String
+  type        String   // "customer" | "supplier"
+  entityName  String
+  amount      Float
+  description String?
+  status      String   // "unpaid" | "paid"
+  dueDate     DateTime?
+  paidAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  store       Store    @relation(fields: [storeId], references: [id])
+}
