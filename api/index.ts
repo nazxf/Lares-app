@@ -1,58 +1,35 @@
 import express from 'express';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import initSqlJs from 'sql.js';
-import { neon } from '@neondatabase/serverless';
-import { SqlStore } from '../server/database.js';
+import { NeonStore } from '../server/neon-store.js';
 import { registerApiRoutes } from '../server/routes.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 // Middleware
 app.use(express.json({ limit: '1mb' }));
 
-// Create SQL store based on environment
-async function createStore() {
-  // Check if we're in production with Postgres
-  if (process.env.POSTGRES_URL) {
-    console.log('Using Neon Postgres database');
-    
-    // For now, still use SQLite as we need to implement Postgres adapter
-    // TODO: Implement full Postgres support
-    console.warn('Postgres adapter not yet implemented, falling back to SQLite');
+// CORS for development
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
   }
-  
-  // Use SQLite (works in serverless with limitations)
-  console.log('Using SQLite database');
-  const databasePath = path.join(__dirname, '..', 'data', 'lares.sqlite');
-  const wasmPath = path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist');
-  
-  try {
-    const SQL = await initSqlJs({
-      locateFile: (file) => path.join(wasmPath, file),
-    });
-    
-    const db = fs.existsSync(databasePath)
-      ? new SQL.Database(fs.readFileSync(databasePath))
-      : new SQL.Database();
+  next();
+});
 
-    return new SqlStore(db, databasePath);
-  } catch (error) {
-    console.error('Failed to initialize SQLite:', error);
-    throw error;
+// Initialize store
+let store: NeonStore | null = null;
+
+function getStore(): NeonStore {
+  if (!store) {
+    if (!process.env.POSTGRES_URL) {
+      throw new Error('POSTGRES_URL environment variable is not set');
+    }
+    store = new NeonStore(process.env.POSTGRES_URL);
+    console.log('Neon Postgres store initialized');
   }
-}
-
-// Initialize store (singleton pattern for serverless)
-let storePromise: Promise<SqlStore> | null = null;
-
-async function getStore(): Promise<SqlStore> {
-  if (!storePromise) {
-    storePromise = createStore();
-  }
-  return storePromise;
+  return store;
 }
 
 // Health check endpoint
@@ -60,15 +37,34 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    database: process.env.POSTGRES_URL ? 'postgres (pending)' : 'sqlite'
+    database: process.env.POSTGRES_URL ? 'neon-postgres' : 'not-configured'
   });
 });
 
-// Register routes
-getStore().then((store) => {
-  registerApiRoutes(app, store);
-}).catch((error) => {
+// Initialize store and register routes
+try {
+  const storeInstance = getStore();
+  registerApiRoutes(app, storeInstance as any);
+  console.log('API routes registered successfully');
+} catch (error) {
   console.error('Failed to initialize store:', error);
+  
+  // Fallback error handler
+  app.use((req, res) => {
+    res.status(500).json({ 
+      error: 'Database not configured',
+      message: 'POSTGRES_URL environment variable is required'
+    });
+  });
+}
+
+// Error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('API Error:', err);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: err.message 
+  });
 });
 
 // Export for Vercel
