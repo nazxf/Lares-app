@@ -66,34 +66,57 @@ export class NeonStore {
   }
 
   async updateUser(userId: string, data: { name?: string; storeId?: string }) {
-    const updates: string[] = [];
-    const values: any[] = [];
-
-    if (data.name !== undefined) {
-      updates.push(`name = $${values.length + 1}`);
-      values.push(data.name);
+    if (data.name !== undefined && data.storeId !== undefined) {
+      const result = await this.sql`
+        UPDATE users 
+        SET name = ${data.name}, store_id = ${data.storeId}
+        WHERE id = ${userId}
+        RETURNING *
+      `;
+      if (result.length === 0) return null;
+      return {
+        id: result[0].id,
+        email: result[0].email,
+        name: result[0].name,
+        role: result[0].role,
+        storeId: result[0].store_id,
+        createdAt: Number(result[0].created_at)
+      };
+    } else if (data.name !== undefined) {
+      const result = await this.sql`
+        UPDATE users 
+        SET name = ${data.name}
+        WHERE id = ${userId}
+        RETURNING *
+      `;
+      if (result.length === 0) return null;
+      return {
+        id: result[0].id,
+        email: result[0].email,
+        name: result[0].name,
+        role: result[0].role,
+        storeId: result[0].store_id,
+        createdAt: Number(result[0].created_at)
+      };
+    } else if (data.storeId !== undefined) {
+      const result = await this.sql`
+        UPDATE users 
+        SET store_id = ${data.storeId}
+        WHERE id = ${userId}
+        RETURNING *
+      `;
+      if (result.length === 0) return null;
+      return {
+        id: result[0].id,
+        email: result[0].email,
+        name: result[0].name,
+        role: result[0].role,
+        storeId: result[0].store_id,
+        createdAt: Number(result[0].created_at)
+      };
     }
-    if (data.storeId !== undefined) {
-      updates.push(`store_id = $${values.length + 1}`);
-      values.push(data.storeId);
-    }
 
-    if (updates.length === 0) return this.getUser(userId);
-
-    const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${values.length + 1} RETURNING *`;
-    values.push(userId);
-
-    const result = await this.sql(query, values);
-    if (result.length === 0) return null;
-
-    return {
-      id: result[0].id,
-      email: result[0].email,
-      name: result[0].name,
-      role: result[0].role,
-      storeId: result[0].store_id,
-      createdAt: Number(result[0].created_at)
-    };
+    return this.getUser(userId);
   }
 
   // Store methods
@@ -237,22 +260,35 @@ export class NeonStore {
   }
 
   async getTransactions(storeId: string, filters?: any) {
-    let query = `SELECT * FROM transactions WHERE store_id = $1`;
-    const params = [storeId];
+    let transactions;
 
-    if (filters?.type) {
-      query += ` AND type = $${params.length + 1}`;
-      params.push(filters.type);
+    if (filters?.type && filters?.limit) {
+      transactions = await this.sql`
+        SELECT * FROM transactions 
+        WHERE store_id = ${storeId} AND type = ${filters.type}
+        ORDER BY created_at DESC
+        LIMIT ${filters.limit}
+      `;
+    } else if (filters?.type) {
+      transactions = await this.sql`
+        SELECT * FROM transactions 
+        WHERE store_id = ${storeId} AND type = ${filters.type}
+        ORDER BY created_at DESC
+      `;
+    } else if (filters?.limit) {
+      transactions = await this.sql`
+        SELECT * FROM transactions 
+        WHERE store_id = ${storeId}
+        ORDER BY created_at DESC
+        LIMIT ${filters.limit}
+      `;
+    } else {
+      transactions = await this.sql`
+        SELECT * FROM transactions 
+        WHERE store_id = ${storeId}
+        ORDER BY created_at DESC
+      `;
     }
-
-    query += ` ORDER BY created_at DESC`;
-
-    if (filters?.limit) {
-      query += ` LIMIT $${params.length + 1}`;
-      params.push(filters.limit);
-    }
-
-    const transactions = await this.sql(query, params);
     
     return transactions.map(t => ({
       id: t.id,
@@ -297,22 +333,35 @@ export class NeonStore {
   }
 
   async getStockMovements(storeId: string, filters?: any) {
-    let query = `SELECT * FROM stock_movements WHERE store_id = $1`;
-    const params = [storeId];
+    let movements;
 
-    if (filters?.productId) {
-      query += ` AND product_id = $${params.length + 1}`;
-      params.push(filters.productId);
+    if (filters?.productId && filters?.limit) {
+      movements = await this.sql`
+        SELECT * FROM stock_movements 
+        WHERE store_id = ${storeId} AND product_id = ${filters.productId}
+        ORDER BY created_at DESC
+        LIMIT ${filters.limit}
+      `;
+    } else if (filters?.productId) {
+      movements = await this.sql`
+        SELECT * FROM stock_movements 
+        WHERE store_id = ${storeId} AND product_id = ${filters.productId}
+        ORDER BY created_at DESC
+      `;
+    } else if (filters?.limit) {
+      movements = await this.sql`
+        SELECT * FROM stock_movements 
+        WHERE store_id = ${storeId}
+        ORDER BY created_at DESC
+        LIMIT ${filters.limit}
+      `;
+    } else {
+      movements = await this.sql`
+        SELECT * FROM stock_movements 
+        WHERE store_id = ${storeId}
+        ORDER BY created_at DESC
+      `;
     }
-
-    query += ` ORDER BY created_at DESC`;
-
-    if (filters?.limit) {
-      query += ` LIMIT $${params.length + 1}`;
-      params.push(filters.limit);
-    }
-
-    const movements = await this.sql(query, params);
     
     return movements.map(m => ({
       id: m.id,
