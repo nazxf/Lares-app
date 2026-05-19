@@ -18,24 +18,31 @@ async function createStore() {
   // Check if we're in production with Postgres
   if (process.env.POSTGRES_URL) {
     console.log('Using Neon Postgres database');
-    // For now, we'll use SQLite until we fully migrate
-    // TODO: Implement Postgres adapter
+    
+    // For now, still use SQLite as we need to implement Postgres adapter
+    // TODO: Implement full Postgres support
+    console.warn('Postgres adapter not yet implemented, falling back to SQLite');
   }
   
-  // Fallback to SQLite
-  console.log('Using SQLite database (fallback)');
+  // Use SQLite (works in serverless with limitations)
+  console.log('Using SQLite database');
   const databasePath = path.join(__dirname, '..', 'data', 'lares.sqlite');
   const wasmPath = path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist');
   
-  const SQL = await initSqlJs({
-    locateFile: (file) => path.join(wasmPath, file),
-  });
-  
-  const db = fs.existsSync(databasePath)
-    ? new SQL.Database(fs.readFileSync(databasePath))
-    : new SQL.Database();
+  try {
+    const SQL = await initSqlJs({
+      locateFile: (file) => path.join(wasmPath, file),
+    });
+    
+    const db = fs.existsSync(databasePath)
+      ? new SQL.Database(fs.readFileSync(databasePath))
+      : new SQL.Database();
 
-  return new SqlStore(db, databasePath);
+    return new SqlStore(db, databasePath);
+  } catch (error) {
+    console.error('Failed to initialize SQLite:', error);
+    throw error;
+  }
 }
 
 // Initialize store (singleton pattern for serverless)
@@ -48,16 +55,20 @@ async function getStore(): Promise<SqlStore> {
   return storePromise;
 }
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    database: process.env.POSTGRES_URL ? 'postgres (pending)' : 'sqlite'
+  });
+});
+
 // Register routes
 getStore().then((store) => {
   registerApiRoutes(app, store);
 }).catch((error) => {
   console.error('Failed to initialize store:', error);
-});
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Export for Vercel
