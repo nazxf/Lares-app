@@ -1,175 +1,107 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Lares POS
 
-# Lares - POS & Inventory Management System
+Lares POS is a compact point-of-sale and inventory dashboard for daily water and gas store operations. It focuses on fast cashier workflows, stock visibility, sales tracking, and owner-friendly reporting.
 
-A high-performance Point of Sale and Inventory Management application built with React, Express, and SQLite.
+## What Is Included
 
-View your app in AI Studio: https://ai.studio/apps/03901251-3437-4e02-b2ea-5d6d0e4a1c55
+- Operational POS dashboard for revenue, transactions, stock, and low-stock alerts.
+- Product management with search, stock counts, prices, and status.
+- Sales workflow with cart, payment summary, and recent transactions.
+- Dark and light themes with a SaaS-style dark default.
+- Neon Postgres data storage for local and production runtime.
+- Upstash Redis caching for faster repeated API responses.
+- GitHub Actions CI plus Dependabot dependency updates.
 
-## ✨ Features
+## Tech Stack
 
-- 📦 **Product Management** - Track inventory, pricing, and stock levels
-- 💰 **Sales Processing** - Fast and efficient POS system
-- 📊 **Stock Movements** - Monitor stock in/out transactions
-- 📈 **Reports & Analytics** - Business insights and reporting
-- 👥 **Multi-user Support** - Owner and cashier roles
-- 🚀 **High Performance** - Optimized with caching and indexing
-- 🔄 **CI/CD Pipeline** - Automated testing and deployment
+- React 19
+- Vite 6
+- TypeScript
+- Tailwind CSS 4
+- Express
+- Neon Postgres
+- Upstash Redis
+- Recharts
+- lucide-react
 
-## 🚀 Quick Start
+## Requirements
 
-**Prerequisites:** Node.js 18+
+- Node.js 20 or newer
+- npm
+- Neon Postgres connection string
+- Upstash Redis REST URL and token
 
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+## Setup
 
-2. **Run the app:**
-   ```bash
-   npm run dev
-   ```
-
-3. **Access the app:**
-   - Open browser: `http://localhost:3000`
-   - Database: `data/lares.sqlite`
-
-## 📋 Available Scripts
+Install dependencies:
 
 ```bash
-npm run dev      # Start development server
-npm run build    # Build for production
-npm run preview  # Preview production build
-npm run lint     # TypeScript type checking
-npm run clean    # Clean build artifacts
+npm install
 ```
 
-## 🏗️ Tech Stack
-
-- **Frontend:** React 19, React Router, TailwindCSS
-- **Backend:** Express.js, Node.js
-- **Database:** SQLite with sql.js
-- **Build Tool:** Vite
-- **UI Components:** Shadcn/ui, Lucide Icons
-- **Charts:** Recharts
-- **Styling:** Tailwind CSS, Motion (Framer Motion)
-
-## ⚡ Performance Optimizations
-
-This application includes several performance enhancements:
-
-### Database Optimization
-- ✅ 17 strategic indexes for faster queries
-- ✅ SQLite PRAGMA optimizations (WAL mode, memory cache)
-- ✅ Query optimization with prepared statements
-
-### Caching
-- ✅ In-memory caching with 5-minute TTL
-- ✅ Automatic cache invalidation
-- ✅ 80%+ cache hit rate for repeated queries
-
-### Network
-- ✅ Gzip compression (60-80% size reduction)
-- ✅ Response time monitoring
-- ✅ Slow query detection
-
-**Performance Improvements:**
-- User login: **< 50ms**
-- List products: **< 100ms**
-- Process transaction: **< 200ms**
-- List transactions: **< 150ms**
-
-See [PERFORMANCE.md](./PERFORMANCE.md) for detailed optimization guide.
-
-## 🔄 CI/CD Pipeline
-
-Automated workflows using GitHub Actions:
-
-- ✅ Lint & Type Check
-- ✅ Build & Test
-- ✅ Security Audit
-- ✅ Automated Deployment
-- ✅ Weekly Dependency Updates
-
-See [CI-CD.md](./CI-CD.md) for setup instructions.
-
-## 📊 Monitoring
-
-### Health Check Endpoint
-```bash
-GET /api/health
-```
-
-Returns server status, uptime, and memory usage.
-
-### Performance Monitoring
-- Response time headers on all API calls
-- Slow query logging (> 100ms)
-- Memory usage tracking
-
-## 🗂️ Project Structure
-
-```
-lares-app/
-├── .github/workflows/    # CI/CD pipelines
-├── src/
-│   ├── pages/           # React pages
-│   ├── components/      # Reusable components
-│   ├── contexts/        # React contexts
-│   ├── layouts/         # Layout components
-│   └── lib/            # Utilities
-├── data/               # SQLite database
-├── server.ts           # Express server
-├── PERFORMANCE.md      # Performance guide
-├── CI-CD.md           # CI/CD documentation
-└── OPTIMIZATION-SUMMARY.md  # Optimization details
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-Copy `.env.example` to `.env`:
+Create `.env` from the example:
 
 ```bash
-GEMINI_API_KEY=your_api_key_here
+cp .env.example .env
+```
+
+Fill these values:
+
+```text
 APP_URL=http://localhost:3000
+POSTGRES_URL=postgresql://...
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=...
 ```
 
-### Database Maintenance
+Initialize the database by running `neon-schema.sql` in the Neon SQL Editor.
+
+## Development
+
+Start the app:
+
 ```bash
-# Vacuum database (monthly)
-sqlite3 data/lares.sqlite "VACUUM;"
-
-# Analyze statistics (weekly)
-sqlite3 data/lares.sqlite "ANALYZE;"
+npm run dev
 ```
 
-## 📚 Documentation
+Open:
 
-- [PERFORMANCE.md](./PERFORMANCE.md) - Performance optimization guide
-- [CI-CD.md](./CI-CD.md) - CI/CD pipeline documentation
-- [OPTIMIZATION-SUMMARY.md](./OPTIMIZATION-SUMMARY.md) - Complete optimization summary
+```text
+http://localhost:3000
+```
 
-## 🤝 Contributing
+## Production Build
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+```bash
+npm run build
+```
 
-## 📝 License
+Run the production server locally:
 
-This project is licensed under the MIT License.
+```bash
+npm run preview
+```
 
-## 🙏 Acknowledgments
+## Checks
 
-- Built with [AI Studio](https://ai.studio)
-- UI components from [Shadcn/ui](https://ui.shadcn.com)
-- Icons from [Lucide](https://lucide.dev)
+```bash
+npm run lint
+npm run build
+```
 
----
+## Deployment
 
-Made with ❤️ for efficient business management
+Set the production environment variables in Vercel:
+
+```text
+POSTGRES_URL=postgresql://...
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=...
+NODE_ENV=production
+```
+
+Deploy with Vercel or through the connected GitHub repository.
+
+## Maintenance
+
+Dependabot is configured for npm packages and GitHub Actions. Pull requests should pass CI before merging.

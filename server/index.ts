@@ -1,11 +1,10 @@
+import 'dotenv/config';
 import express from 'express';
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import initSqlJs from 'sql.js';
 import { createServer as createViteServer } from 'vite';
 import compression from 'compression';
-import { SqlStore } from './database.js';
+import { NeonStore } from './neon-store.js';
 import { registerApiRoutes } from './routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -17,18 +16,12 @@ const isProduction = process.env.NODE_ENV === 'production';
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 
-// Create SQL store
-async function createSqlStore(): Promise<SqlStore> {
-  const databasePath = path.join(__dirname, '..', 'data', 'lares.sqlite');
-  const wasmPath = path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist');
-  const SQL = await initSqlJs({
-    locateFile: (file) => path.join(wasmPath, file),
-  });
-  const db = fs.existsSync(databasePath)
-    ? new SQL.Database(fs.readFileSync(databasePath))
-    : new SQL.Database();
+function createStore(): NeonStore {
+  if (!process.env.POSTGRES_URL) {
+    throw new Error('POSTGRES_URL environment variable is required');
+  }
 
-  return new SqlStore(db, databasePath);
+  return new NeonStore(process.env.POSTGRES_URL);
 }
 
 // Register frontend
@@ -56,13 +49,13 @@ async function registerFrontend() {
 // Start server
 async function startServer() {
   try {
-    const store = await createSqlStore();
+    const store = createStore();
     registerApiRoutes(app, store);
     await registerFrontend();
 
     app.listen(port, '0.0.0.0', () => {
       console.log(`Lares app running on http://localhost:${port}`);
-      console.log(`SQL database: ${path.join(__dirname, '..', 'data', 'lares.sqlite')}`);
+      console.log('Database: Neon Postgres');
     });
   } catch (error) {
     console.error('Failed to start server:', error);

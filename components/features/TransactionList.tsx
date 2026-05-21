@@ -13,7 +13,7 @@ export function TransactionList({ transactions, loading }: TransactionListProps)
   if (loading) {
     return (
       <div className="text-center py-12 text-slate-400">
-        <p>Memuat transaksi...</p>
+        <p>Memuat transaksi…</p>
       </div>
     );
   }

@@ -20,8 +20,8 @@
 
 **Database Improvements:**
 - ✅ 17 strategic indexes for faster queries
-- ✅ SQLite PRAGMA optimizations (WAL, cache, mmap)
-- ✅ Query optimization with prepared statements
+- ✅ Neon Postgres indexes for faster operational queries
+- ✅ Redis-backed caching for repeated reads
 
 **Caching System:**
 - ✅ In-memory cache with 5-minute TTL

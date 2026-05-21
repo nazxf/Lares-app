@@ -9,7 +9,7 @@
 
 ### ✅ Credentials Received
 ```
-UPSTASH_REDIS_REST_URL: https://helped-kitten-129844.upstash.io
+UPSTASH_REDIS_REST_URL: https://your-redis-url.upstash.io
 UPSTASH_REDIS_REST_TOKEN: ggAAAAAAAfs0AAIgcDIHP6KhKgfe7xCs4NJ86XmaJtpC4oDlcE2d6Y0u2rhskA
 ```
 
@@ -36,7 +36,7 @@ UPSTASH_REDIS_REST_TOKEN: ggAAAAAAAfs0AAIgcDIHP6KhKgfe7xCs4NJ86XmaJtpC4oDlcE2d6Y
 
 ### Database Info
 ```
-Name: helped-kitten-129844
+Name: your-upstash-database
 Region: Upstash Global
 Type: REST API (HTTP)
 Protocol: HTTPS
@@ -109,7 +109,7 @@ Steady state:     80-90%
 ### Method 3: Upstash Dashboard
 
 1. **Go to:** https://console.upstash.com
-2. **Click:** "helped-kitten-129844" database
+2. **Click:** your Upstash Redis database
 3. **Check Metrics:**
    - Total Commands (should increase)
    - Daily Commands
@@ -182,7 +182,7 @@ Steady state:     80-90%
 
 ### Upstash Dashboard Metrics
 
-**Go to:** https://console.upstash.com/redis/helped-kitten-129844
+**Go to:** https://console.upstash.com/redis
 
 **Check:**
 - **Total Commands:** Should increase over time
@@ -310,7 +310,7 @@ Your Lares app now has:
 - **Vercel Dashboard:** https://vercel.com/nafiaku447-progs-projects/lares-app
 - **Vercel Logs:** https://vercel.com/nafiaku447-progs-projects/lares-app/logs
 - **Upstash Dashboard:** https://console.upstash.com
-- **Upstash Database:** https://console.upstash.com/redis/helped-kitten-129844
+- **Upstash Database:** https://console.upstash.com/redis
 
 ---
 

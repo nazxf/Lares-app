@@ -1,8 +1,6 @@
 {
-  "name": "Water & Gas Store Dashboard",
-  "description": "A modern premium admin dashboard for managing water gallon, bottled water, and gas store stock and sales.",
+  "name": "Lares POS",
+  "description": "A premium POS and inventory dashboard for water and gas store operations.",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": []
 }

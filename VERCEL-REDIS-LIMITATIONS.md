@@ -352,7 +352,7 @@ Source: https://vercel.com/docs/functions/serverless-functions
    - Free tier available
    - Global regions
 
-4. **AWS EC2 / Google Compute Engine**
+4. **Cloud VM**
    - Full control
    - Can run anything
    - Cost: $10+/month

@@ -37,7 +37,7 @@ Refactoring **Option B (Medium Refactoring)** telah selesai dengan sukses!
 3. `src/lib/constants.ts` - Application constants (140 lines)
 4. `server/validators.ts` - Input validation (50 lines)
 5. `server/mappers.ts` - Row mappers (55 lines)
-6. `server/database.ts` - SqlStore class (400 lines)
+6. `server/neon-store.ts` - Neon Postgres store
 7. `server/routes.ts` - API routes (110 lines)
 8. `server/index.ts` - Server setup (70 lines)
 9. `src/hooks/useProducts.ts` - Product hook (80 lines)
@@ -48,7 +48,7 @@ Refactoring **Option B (Medium Refactoring)** telah selesai dengan sukses!
 **Modified:**
 - `package.json` - Updated dev script
 - `tsconfig.json` - Fixed path aliases
-- `server.ts` → `server.ts.backup` (archived)
+- `server/index.ts` - Current modular server entrypoint
 
 ### **Phase 2: Components & Hooks** ✅
 **Created:**

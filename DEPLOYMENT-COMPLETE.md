@@ -36,7 +36,6 @@
 |----------|--------|-------------|
 | `POSTGRES_URL` | ✅ Set | Production, Development |
 | `NODE_ENV` | ✅ Set | Production |
-| `GEMINI_API_KEY` | ⚠️ Optional | Not set |
 
 ---
 
@@ -70,35 +69,25 @@
 - API endpoints
 - Health check: `/api/health`
 
-### ⚠️ Pending:
-- Full Postgres adapter implementation
-- Currently using SQLite in serverless (not persistent)
-- Need to migrate to Postgres for data persistence
+### Data Layer:
+- Neon Postgres adapter is implemented
+- Serverless API uses Postgres for persistent data
 
 ---
 
 ## 📝 Next Steps (Optional)
 
-### 1. Implement Full Postgres Support
-Currently the app detects Postgres but still uses SQLite. To fully migrate:
-- Implement Postgres adapter in `server/database-postgres.ts`
-- Update `api/index.ts` to use Postgres adapter
+### 1. Postgres Support
+The app now uses the Neon store for API and local server runtime.
 - Test all CRUD operations
 
-### 2. Add Gemini AI Integration (Optional)
-If you want AI features:
-```bash
-vercel env add GEMINI_API_KEY production
-# Paste your Gemini API key
-```
-
-### 3. Custom Domain (Optional)
+### 2. Custom Domain (Optional)
 Add your own domain:
 1. Go to: https://vercel.com/nafiaku447-progs-projects/lares-app/settings/domains
 2. Add domain
 3. Update DNS records
 
-### 4. Monitor Usage
+### 3. Monitor Usage
 - Vercel: https://vercel.com/nafiaku447-progs-projects/lares-app/analytics
 - Neon: https://console.neon.tech (check storage & compute usage)
 

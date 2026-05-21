@@ -1,5 +1,5 @@
 -- Neon Postgres Schema for Lares App
--- Compatible with existing SQLite structure
+-- Primary schema for Neon Postgres
 -- Run this in Neon SQL Editor: https://console.neon.tech
 
 -- Users table

@@ -16,7 +16,7 @@ export function ProductTable({ products, onEdit, loading }: ProductTableProps) {
   if (loading) {
     return (
       <div className="text-center py-12 text-slate-400">
-        <p>Memuat produk...</p>
+        <p>Memuat produk…</p>
       </div>
     );
   }
@@ -39,7 +39,7 @@ export function ProductTable({ products, onEdit, loading }: ProductTableProps) {
           <TableHead className="text-right">Harga Beli</TableHead>
           <TableHead className="text-center">Stok</TableHead>
           <TableHead className="text-center">Status</TableHead>
-          {onEdit && <TableHead className="w-[50px]"></TableHead>}
+          {onEdit && <TableHead className="w-[50px] text-right">Aksi</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -66,6 +66,7 @@ export function ProductTable({ products, onEdit, loading }: ProductTableProps) {
                   size="icon"
                   onClick={() => onEdit(product)}
                   className="text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                  aria-label={`Edit produk ${product.name}`}
                 >
                   <Edit2 className="w-4 h-4" />
                 </Button>

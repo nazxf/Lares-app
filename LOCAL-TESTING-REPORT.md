@@ -33,16 +33,14 @@ npm run lint
 - Added `@/types` alias to `vite.config.ts`
 - Added `@/types` path mapping to `tsconfig.json`
 
-#### B. Neon SQL Type Errors (16 errors)
+#### B. Neon SQL Type Errors (12 errors)
 **Issue:** `Property 'length' does not exist on type 'FullQueryResults<boolean>'`
 
 **Files Affected:**
 - `server/neon-store.ts` (12 errors)
-- `server/database-postgres.ts` (4 errors)
 
 **Fix:**
 - Added type assertion `as any[]` to all SQL query results
-- Fixed promise chain type annotation
 
 ---
 
@@ -84,17 +82,6 @@ const users = await this.sql`SELECT * FROM users WHERE email = ${email}` as any[
 ```
 
 Applied to all SQL queries in the file.
-
-### 4. server/database-postgres.ts
-```typescript
-// Before:
-.then(rows => {
-
-// After:
-.then((rows: any[]) => {
-```
-
----
 
 ## ✅ Test Results
 
@@ -147,7 +134,6 @@ npm run dev
 **Message:** "fix: Resolve all TypeScript errors and add type assertions"
 
 **Changes:**
-- `server/database-postgres.ts` - Type fixes
 - `server/neon-store.ts` - Type assertions added
 - `tsconfig.json` - Added @/types path
 - `vite.config.ts` - Added @/types alias

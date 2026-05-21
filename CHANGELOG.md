@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance optimizations
   - In-memory caching with node-cache (5-minute TTL)
   - 17 strategic database indexes for faster queries
-  - SQLite PRAGMA optimizations (WAL mode, 64MB cache)
+  - Neon Postgres indexes for faster operational queries
   - Gzip compression for API responses (60-80% size reduction)
   - Response time monitoring with X-Response-Time headers
   - Slow query detection and logging (> 100ms)
@@ -65,7 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Initial Release
 - React 19 frontend with React Router
-- Express.js backend with SQLite database
+- Express.js backend with Neon Postgres database
 - Product management system
 - Sales processing (POS)
 - Stock movement tracking
@@ -131,6 +131,5 @@ When adding entries to this changelog:
 5. Update version number when releasing
 
 ## Links
-- [GitHub Repository](https://github.com/YOUR_USERNAME/lares-app)
-- [AI Studio](https://ai.studio/apps/03901251-3437-4e02-b2ea-5d6d0e4a1c55)
+- [GitHub Repository](https://github.com/nazxf/Lares-app)
 - [Documentation](./README.md)
